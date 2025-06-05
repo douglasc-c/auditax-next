@@ -700,7 +700,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
                   {t('product')}
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium">
-                  {t('fee')}(%)
+                  {t('fee')} (%)
                 </th>
                 {years.map((year) => (
                   <th
@@ -730,7 +730,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
                     {row.product}
                   </td>
                   <td className="px-4 py-2 text-left text-xs font-medium">
-                    {`${row.percent}%`}
+                    {`${row.percent}`}
                   </td>
                   {years.map((year) => (
                     <td
