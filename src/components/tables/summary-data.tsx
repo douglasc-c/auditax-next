@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { DetailsData, SummaryData } from '@/types/audit'
 import ButtonGlobal from '../buttons/global'
-import { jsPDF as JSPDF } from 'jspdf'
+import { jsPDF as JSPDF, GState } from 'jspdf'
 import * as XLSX from 'xlsx'
 import autoTable from 'jspdf-autotable'
 import { DoughnutChart } from '../charts/doughnut-chart'
@@ -20,14 +20,23 @@ interface SummaryDataTableProps {
   auditId?: string
 }
 
+interface EstablishmentData {
+  companyName: string
+  cnpj: string
+  responsible: string
+}
+
 export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
   const t = useTranslations('TextLang')
   const pathname = usePathname()
   const isSummaryRoute = pathname.includes('/summary/')
   const doughnutChartRef = useRef<HTMLDivElement>(null)
   const barChartRef = useRef<HTMLDivElement>(null)
+  const horizontalBarChartRef = useRef<HTMLDivElement>(null)
   const flagDropdownRef = useRef<HTMLDivElement>(null)
   const methodDropdownRef = useRef<HTMLDivElement>(null)
+  const [establishmentData, setEstablishmentData] =
+    useState<EstablishmentData | null>(null)
 
   // Estados para os filtros
   const [selectedFlags, setSelectedFlags] = useState<string[]>([])
@@ -113,6 +122,20 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     })
   }
 
+  // Buscar dados do estabelecimento
+  useEffect(() => {
+    const fetchEstablishmentData = async () => {
+      if (!auditId) return
+      try {
+        const response = await api.get(`/audits/${auditId}`)
+        setEstablishmentData(response.data.audit.establishment)
+      } catch (error) {
+        console.error('Erro ao buscar dados do estabelecimento:', error)
+      }
+    }
+    fetchEstablishmentData()
+  }, [auditId])
+
   const handleExportExcel = async () => {
     if (!data) return
 
@@ -176,23 +199,99 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
   const handleExportPDF = async () => {
     const doc = new JSPDF()
 
-    // Configurar o título
+    // Adicionar marca d'água
+    doc.saveGraphicsState()
+    doc.setGState(new GState({ opacity: 0.1 }))
+    doc.setTextColor(128, 128, 128)
+    doc.setFontSize(120)
+    doc.text('AUDITAXS', 60, 190, { angle: 45 })
+    doc.restoreGraphicsState()
+
+    // Configurar o título e ID lado a lado
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(41, 41, 41)
+
+    // Adicionar logo
+    try {
+      const logoImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new window.Image()
+        img.onload = () => resolve(img)
+        img.onerror = reject
+        img.src = '/images/svg/logoBlack.svg'
+      })
+
+      // Criar um canvas para converter SVG em PNG
+      const canvas = document.createElement('canvas')
+      canvas.width = logoImg.width
+      canvas.height = logoImg.height
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.drawImage(logoImg, 0, 0)
+        const pngData = canvas.toDataURL('image/png')
+        doc.addImage(pngData, 'PNG', 10, 10, 70, 15)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar logo:', error)
+    }
+
+    // Configurar o título e ID lado a lado
     doc.setFontSize(16)
-    doc.text(t('summaryData'), 8, 15)
+    const titleText = t('summaryData')
+    const titleWidth = doc.getTextWidth(titleText)
+    doc.text(titleText, 10, 35)
+
+    // Adicionar ID com cor de fundo
+    doc.setTextColor(231, 146, 4) // Cor #e79204
+    doc.setFontSize(12)
+    doc.text(`#${auditId}`, titleWidth + 20, 35)
+
+    // Resetar cor do texto para preto
+    doc.setTextColor(41, 41, 41)
+
+    if (establishmentData) {
+      doc.setFontSize(10)
+
+      // Adicionar os dados em linhas separadas
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${t('establishment')}:`, 10, 45)
+      doc.setFont('helvetica', 'bold')
+      doc.text(establishmentData.companyName, 10, 50)
+
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${t('cnpj')}:`, 10, 55)
+      doc.setFont('helvetica', 'bold')
+      doc.text(establishmentData.cnpj, 10, 60)
+
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${t('responsible')}:`, 10, 65)
+      doc.setFont('helvetica', 'bold')
+      doc.text(establishmentData.responsible, 10, 70)
+    }
+
+    // Adicionar linha separadora
+    doc.setDrawColor(200, 200, 200)
+    doc.line(10, 75, 200, 75)
 
     // Capturar os gráficos como imagens
     const doughnutCanvas = await html2canvas(doughnutChartRef.current!)
     const barCanvas = await html2canvas(barChartRef.current!)
+    const horizontalBarCanvas = await html2canvas(
+      horizontalBarChartRef.current!,
+    )
 
     // Adicionar os gráficos ao PDF
     const doughnutImgData = doughnutCanvas.toDataURL('image/png')
     const barImgData = barCanvas.toDataURL('image/png')
+    const horizontalBarImgData = horizontalBarCanvas.toDataURL('image/png')
 
     // Adicionar o gráfico de pizza
-    doc.addImage(doughnutImgData, 'PNG', 8, 25, 95, 48)
+    doc.addImage(doughnutImgData, 'PNG', 10, 85, 60, 48)
 
     // Adicionar o gráfico de barras
-    doc.addImage(barImgData, 'PNG', 108, 25, 95, 48)
+    doc.addImage(barImgData, 'PNG', 75, 85, 60, 48)
+
+    // Adicionar o gráfico de barras horizontais
+    doc.addImage(horizontalBarImgData, 'PNG', 140, 85, 60, 48)
 
     // Preparar os dados para a tabela
     const tableData = [
@@ -207,6 +306,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
       [
         t('total'),
         '-',
+        '-',
         ...years.map((year) =>
           formatNumberBR(
             filteredData.reduce((sum, row) => sum + parseValue(row[year]), 0),
@@ -215,7 +315,6 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
         formatNumberBR(
           filteredData.reduce((sum, row) => sum + calculateRowTotal(row), 0),
         ),
-        '-',
       ],
     ]
 
@@ -223,7 +322,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     const columns = [
       t('brand'),
       t('product'),
-      t('percent'),
+      t('fee'),
       ...years,
       t('totalGeneral'),
     ]
@@ -232,16 +331,18 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     autoTable(doc, {
       head: [columns],
       body: tableData,
-      startY: 80,
+      startY: 138,
       theme: 'grid',
       styles: {
         fontSize: 8,
         cellPadding: 2,
+        font: 'helvetica',
       },
       headStyles: {
         fillColor: [41, 41, 41],
         textColor: 255,
         fontStyle: 'bold',
+        fontSize: 9,
       },
       alternateRowStyles: {
         fillColor: [245, 245, 245],
@@ -255,6 +356,21 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
       },
       margin: { top: 20, left: 10, right: 10 },
     })
+
+    // Adicionar rodapé
+    const pageCount = doc.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(128, 128, 128)
+      doc.text(
+        `Página ${i} de ${pageCount}`,
+        doc.internal.pageSize.width / 2,
+        doc.internal.pageSize.height - 10,
+        { align: 'center' },
+      )
+    }
 
     // Salvar o PDF
     doc.save(`summary-${new Date().toISOString().split('T')[0]}.pdf`)
@@ -555,7 +671,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
             }}
           />
         </div>
-        <div className="bg-zinc-800 p-4 rounded-lg">
+        <div className="bg-zinc-800 p-4 rounded-lg" ref={horizontalBarChartRef}>
           <h3 className="text-zinc-200 text-sm font-medium mb-2">
             Valores por Produto
           </h3>
