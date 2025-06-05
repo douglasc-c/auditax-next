@@ -322,7 +322,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     const columns = [
       t('brand'),
       t('product'),
-      t('fee'),
+      t('fee') + ' (%)',
       ...years,
       t('totalGeneral'),
     ]
@@ -700,7 +700,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
                   {t('product')}
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium">
-                  {t('fee')}
+                  {t('fee')}(%)
                 </th>
                 {years.map((year) => (
                   <th
