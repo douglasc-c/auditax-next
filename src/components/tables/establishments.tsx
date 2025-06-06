@@ -51,6 +51,7 @@ export function EstablishmentsTable({ data }: EstablishmentsTableProps) {
 
     try {
       await api.delete(`/establishments/${establishmentToDelete}`)
+
       window.location.reload()
     } catch (error) {
       console.error('Erro ao excluir estabelecimento:', error)

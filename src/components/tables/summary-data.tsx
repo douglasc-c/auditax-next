@@ -203,8 +203,8 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     doc.saveGraphicsState()
     doc.setGState(new GState({ opacity: 0.1 }))
     doc.setTextColor(128, 128, 128)
-    doc.setFontSize(120)
-    doc.text('AUDITAXS', 60, 190, { angle: 45 })
+    doc.setFontSize(150)
+    doc.text('AUDITAXS', 23, 250, { angle: 45 })
     doc.restoreGraphicsState()
 
     // Configurar o título e ID lado a lado
@@ -243,7 +243,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     // Adicionar ID com cor de fundo
     doc.setTextColor(231, 146, 4) // Cor #e79204
     doc.setFontSize(12)
-    doc.text(`#${auditId}`, titleWidth + 20, 35)
+    doc.text(`#${auditId}`, titleWidth + 12, 35)
 
     // Resetar cor do texto para preto
     doc.setTextColor(41, 41, 41)
@@ -285,13 +285,13 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     const horizontalBarImgData = horizontalBarCanvas.toDataURL('image/png')
 
     // Adicionar o gráfico de pizza
-    doc.addImage(doughnutImgData, 'PNG', 10, 85, 60, 48)
+    doc.addImage(doughnutImgData, 'PNG', 10, 80, 60, 48)
 
     // Adicionar o gráfico de barras
-    doc.addImage(barImgData, 'PNG', 75, 85, 60, 48)
+    doc.addImage(barImgData, 'PNG', 75, 80, 60, 48)
 
     // Adicionar o gráfico de barras horizontais
-    doc.addImage(horizontalBarImgData, 'PNG', 140, 85, 60, 48)
+    doc.addImage(horizontalBarImgData, 'PNG', 140, 80, 60, 48)
 
     // Preparar os dados para a tabela
     const tableData = [
@@ -304,7 +304,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
       ]),
       // Adiciona linha de total
       [
-        t('total'),
+        t('totalGeneral'),
         '-',
         '-',
         ...years.map((year) =>
@@ -324,19 +324,20 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
       t('product'),
       t('fee') + ' (%)',
       ...years,
-      t('totalGeneral'),
+      t('total') + ' (R$)',
     ]
 
     // Adicionar a tabela ao PDF
     autoTable(doc, {
       head: [columns],
       body: tableData,
-      startY: 138,
+      startY: 132,
       theme: 'grid',
       styles: {
         fontSize: 8,
         cellPadding: 2,
         font: 'helvetica',
+        fillColor: false,
       },
       headStyles: {
         fillColor: [41, 41, 41],
@@ -359,21 +360,62 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
 
     // Adicionar rodapé
     const pageCount = doc.getNumberOfPages()
+    const date = new Date()
+    const months = [
+      'janeiro',
+      'fevereiro',
+      'março',
+      'abril',
+      'maio',
+      'junho',
+      'julho',
+      'agosto',
+      'setembro',
+      'outubro',
+      'novembro',
+      'dezembro',
+    ]
+    const currentDate = `${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`
+    const currentTime = date.toLocaleTimeString('pt-BR')
+
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i)
+
+      // Adicionar linha separadora
+      doc.setDrawColor(200, 200, 200)
+      doc.line(
+        10,
+        doc.internal.pageSize.height - 15,
+        200,
+        doc.internal.pageSize.height - 15,
+      )
+
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(128, 128, 128)
+
+      // Informações do rodapé
+      const footerText = `Auditaxs | ${currentDate} - ${currentTime}, Curitiba, Paraná, Brasil | ID: ${auditId}`
+
+      // Adicionar paginação à esquerda
       doc.text(
         `Página ${i} de ${pageCount}`,
-        doc.internal.pageSize.width / 2,
+        10,
         doc.internal.pageSize.height - 10,
-        { align: 'center' },
+        { align: 'left' },
+      )
+
+      // Adicionar informações à direita
+      doc.text(
+        footerText,
+        doc.internal.pageSize.width - 10,
+        doc.internal.pageSize.height - 10,
+        { align: 'right' },
       )
     }
 
     // Salvar o PDF
-    doc.save(`summary-${new Date().toISOString().split('T')[0]}.pdf`)
+    doc.save(`sintese-${establishmentData?.companyName}.pdf`)
   }
 
   const handleShareSummary = () => {
@@ -711,7 +753,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
                   </th>
                 ))}
                 <th className="px-4 py-2 text-left text-xs font-medium">
-                  {t('totalGeneral')}
+                  {t('total') + ' (R$)'}
                 </th>
               </tr>
             </thead>
@@ -748,7 +790,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
               {/* Linha de total */}
               <tr className="font-bold">
                 <td className="px-4 py-2 text-left text-sm font-bold">
-                  {t('total')}
+                  {t('totalGeneral')}
                 </td>
                 <td className="px-4 py-2 text-left text-xs font-medium">-</td>
                 <td className="px-4 py-2 text-left text-xs font-medium">-</td>

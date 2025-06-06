@@ -102,6 +102,7 @@ export default function Establishments() {
           ...prevFilteredEstablishments,
           newEstablishment,
         ])
+        closeModal()
       } else {
         setError(
           response.data.message ||
@@ -127,7 +128,6 @@ export default function Establishments() {
     } finally {
       fetchEstablishments()
       setLoadingButton(false)
-      closeModal()
     }
   }
 
