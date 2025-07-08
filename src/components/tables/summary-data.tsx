@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { DetailsData, SummaryData } from '@/types/audit'
+import { SummaryData, YearData } from '@/types/audit'
 import ButtonGlobal from '../buttons/global'
 import { jsPDF as JSPDF, GState } from 'jspdf'
 import * as XLSX from 'xlsx'
@@ -15,6 +15,13 @@ import { toast } from 'react-hot-toast'
 import api from '@/lib/api'
 import { usePathname } from 'next/navigation'
 
+type TableRow = {
+  brand: string
+  product: string
+  percent: string
+  [year: string]: string
+}
+
 interface SummaryDataTableProps {
   data: SummaryData[]
   auditId?: string
@@ -24,6 +31,29 @@ interface EstablishmentData {
   companyName: string
   cnpj: string
   responsible: string
+}
+
+interface DetailsDataRow {
+  id: string
+  auditId: string
+  establishment_code: string
+  acquirer: string
+  sale_date: string
+  sale_status: string
+  nsu: string
+  card_brand: string
+  payment_method: string
+  product: string
+  sale_amount: string
+  fee_amount: string
+  net_amount: string
+  reference_rate: string
+  card_number: string
+  receipt_date: string
+  audited_rate: string
+  audited_fee_amount: string
+  amount_difference: string
+  created_at: string
 }
 
 export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
@@ -46,22 +76,72 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
   const [isMethodDropdownOpen, setIsMethodDropdownOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
-  // Garantir que data seja um array
-  const safeData = useMemo(() => (Array.isArray(data) ? data : []), [data])
+  // Transformar dados da nova estrutura para a estrutura esperada
+  const transformedData = useMemo(() => {
+    if (!Array.isArray(data)) return []
+
+    // Primeiro, coletar todos os anos únicos de todos os itens
+    const allYears = new Set<string>()
+    data.forEach((item) => {
+      if (item.years && Array.isArray(item.years)) {
+        item.years.forEach((yearData: YearData) => {
+          allYears.add(yearData.year.toString())
+        })
+      }
+    })
+
+    const sortedYears = Array.from(allYears).sort()
+
+    return data.map((item): TableRow => {
+      if (item.years && Array.isArray(item.years)) {
+        const transformedItem: TableRow = {
+          brand: item.brand,
+          product: item.product,
+          percent: item.percentage,
+        }
+
+        // Preencher todos os anos, mesmo os que não existem no item atual
+        sortedYears.forEach((year) => {
+          const yearData = item.years?.find(
+            (yd: YearData) => yd.year.toString() === year,
+          )
+          transformedItem[year] = yearData ? yearData.value : '0,00'
+        })
+
+        return transformedItem
+      }
+      return item as unknown as TableRow
+    })
+  }, [data])
+
+  // Garantir que transformedData seja um array
+  const safeData = useMemo(
+    () => (Array.isArray(transformedData) ? transformedData : []),
+    [transformedData],
+  )
 
   // Extrair anos únicos dos dados
-  const years =
-    safeData.length > 0
-      ? Object.keys(safeData[0])
-          .filter(
-            (key) =>
-              key !== 'brand' &&
-              key !== 'product' &&
-              key !== 'percent' &&
-              key !== 'Total Geral',
-          )
-          .sort()
-      : []
+  const years = useMemo(() => {
+    if (safeData.length === 0) return []
+
+    // Coletar todos os anos únicos de todos os itens
+    const allYears = new Set<string>()
+
+    safeData.forEach((row) => {
+      Object.keys(row).forEach((key) => {
+        if (
+          key !== 'brand' &&
+          key !== 'product' &&
+          key !== 'percent' &&
+          key !== 'Total Geral'
+        ) {
+          allYears.add(key)
+        }
+      })
+    })
+
+    return Array.from(allYears).sort()
+  }, [safeData])
 
   // Extrair bandeiras e métodos únicos
   const uniqueFlags = useMemo(() => {
@@ -107,8 +187,8 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     return parseFloat(cleanValue) || 0
   }
 
-  // Função para calcular o total de uma linha
-  const calculateRowTotal = (row: SummaryData): number => {
+  // Função para calcular o total de uma linha (versão para TableRow)
+  const calculateRowTotalForTableRow = (row: TableRow): number => {
     return years.reduce((sum, year) => {
       return sum + parseValue(row[year])
     }, 0)
@@ -142,45 +222,62 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     try {
       // Buscar todos os dados para exportação
       const response = await api.get(`/audits/${auditId}/details?allItems=true`)
-
       const allData = response.data.detailsData
 
       if (!allData || !Array.isArray(allData)) return
 
-      // Preparar os dados para o Excel
-      const excelData = allData.map((row: DetailsData) => ({
-        [t('establishmentCode')]: row.cod_estabelecimento,
-        [t('acquirer')]: row.credenciadora,
-        [t('saleDate')]: row.data_venda,
-        [t('status')]: row.status_venda,
-        [t('nsu')]: row.nsu,
-        [t('flag')]: row.bandeira,
-        [t('paymentMethod')]: row.modalidade_pagamento,
-        [t('product')]: row.produto,
-        [t('saleValue')]: formatValue(row.valor_venda),
-        [t('taxValue')]: formatValue(row.valor_taxa),
-        [t('netValue')]: formatValue(row.valor_liquido),
-        [t('referencedTax')]: row.taxa_referenciada + '%',
-        [t('cardNumber')]: row.numero_cartao,
-        [t('receiptDate')]: row.data_recebimento,
-        [t('auditedTax')]: row.taxa_auditada + '%',
-        [t('auditedTaxValue')]: formatValue(row.valor_taxa_auditada),
-        [t('differenceToReceive')]: formatValue(row.diferenca_receber),
-      }))
+      // Processar dados em lotes para evitar estouro de memória
+      const batchSize = 1000
+      const processedData: Record<string, string>[] = []
+
+      for (let i = 0; i < allData.length; i += batchSize) {
+        const batch = allData.slice(i, i + batchSize)
+
+        const batchData = batch.map((row: DetailsDataRow) => ({
+          [t('establishmentCode')]: row.establishment_code,
+          [t('acquirer')]: row.acquirer,
+          [t('saleDate')]: row.sale_date,
+          [t('status')]: row.sale_status,
+          [t('nsu')]: row.nsu,
+          [t('flag')]: row.card_brand,
+          [t('paymentMethod')]: row.payment_method,
+          [t('product')]: row.product,
+          [t('saleValue')]: formatValue(row.sale_amount),
+          [t('taxValue')]: formatValue(row.fee_amount),
+          [t('netValue')]: formatValue(row.net_amount),
+          [t('referencedTax')]: row.reference_rate + '%',
+          [t('cardNumber')]: row.card_number,
+          [t('receiptDate')]: row.receipt_date,
+          [t('auditedTax')]: row.audited_rate + '%',
+          [t('auditedTaxValue')]: formatValue(row.audited_fee_amount),
+          [t('differenceToReceive')]: formatValue(row.amount_difference),
+        }))
+
+        processedData.push(...batchData)
+      }
 
       // Criar workbook e worksheet
       const wb = XLSX.utils.book_new()
-      const ws = XLSX.utils.json_to_sheet(excelData)
+      const ws = XLSX.utils.json_to_sheet(processedData)
 
-      // Ajustar largura das colunas
-      const colWidths = Object.keys(excelData[0]).map((key) => ({
-        wch: Math.max(
-          key.length,
-          ...excelData.map(
-            (row: Record<string, string>) => String(row[key]).length,
-          ),
-        ),
-      }))
+      // Calcular largura das colunas de forma otimizada
+      const columnKeys = Object.keys(processedData[0] || {})
+      const colWidths = columnKeys.map((key) => {
+        let maxWidth = key.length
+
+        // Calcular largura máxima apenas para os primeiros 100 registros para otimização
+        const sampleSize = Math.min(100, processedData.length)
+        for (let i = 0; i < sampleSize; i++) {
+          const cellValue = String(processedData[i][key] || '')
+          maxWidth = Math.max(maxWidth, cellValue.length)
+        }
+
+        // Definir largura mínima e máxima
+        return {
+          wch: Math.min(Math.max(maxWidth, 10), 50),
+        }
+      })
+
       ws['!cols'] = colWidths
 
       // Adicionar worksheet ao workbook
@@ -300,7 +397,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
         row.product,
         row.percent,
         ...years.map((year) => formatValue(row[year])),
-        formatNumberBR(calculateRowTotal(row)),
+        formatNumberBR(calculateRowTotalForTableRow(row)),
       ]),
       // Adiciona linha de total
       [
@@ -313,7 +410,10 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
           ),
         ),
         formatNumberBR(
-          filteredData.reduce((sum, row) => sum + calculateRowTotal(row), 0),
+          filteredData.reduce(
+            (sum, row) => sum + calculateRowTotalForTableRow(row),
+            0,
+          ),
         ),
       ],
     ]
@@ -692,7 +792,10 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
               values: uniqueFlags.map((flag) =>
                 filteredData
                   .filter((row) => row.brand === flag)
-                  .reduce((sum, row) => sum + calculateRowTotal(row), 0),
+                  .reduce(
+                    (sum, row) => sum + calculateRowTotalForTableRow(row),
+                    0,
+                  ),
               ),
             }}
           />
@@ -723,7 +826,10 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
               values: uniqueMethods.map((method) =>
                 filteredData
                   .filter((row) => row.product === method)
-                  .reduce((sum, row) => sum + calculateRowTotal(row), 0),
+                  .reduce(
+                    (sum, row) => sum + calculateRowTotalForTableRow(row),
+                    0,
+                  ),
               ),
             }}
           />
@@ -783,7 +889,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
                     </td>
                   ))}
                   <td className="px-4 py-2 text-left text-xs font-medium">
-                    {formatNumberBR(calculateRowTotal(row))}
+                    {formatNumberBR(calculateRowTotalForTableRow(row))}
                   </td>
                 </tr>
               ))}
@@ -810,7 +916,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
                 <td className="px-4 py-2 text-left text-sm font-bold">
                   {formatNumberBR(
                     filteredData.reduce(
-                      (sum, row) => sum + calculateRowTotal(row),
+                      (sum, row) => sum + calculateRowTotalForTableRow(row),
                       0,
                     ),
                   )}

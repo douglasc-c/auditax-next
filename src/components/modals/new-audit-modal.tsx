@@ -2,7 +2,6 @@ import { useTranslations } from 'next-intl'
 import { useState, useRef, useEffect } from 'react'
 import ButtonGlobal from '../buttons/global'
 import processApi from '@/lib/process-api'
-import api from '@/lib/api'
 import { useRouter, usePathname } from 'next/navigation'
 import { Audit } from '@/types/audit'
 import { PulseLoader } from 'react-spinners'
@@ -89,15 +88,6 @@ export function NewAuditModal({
     setFiles((prevFiles) => prevFiles.filter((_, i) => i !== index))
   }
 
-  // Função para dividir os dados em chunks
-  const chunkArray = <T,>(array: T[], chunkSize: number): T[][] => {
-    const chunks: T[][] = []
-    for (let i = 0; i < array.length; i += chunkSize) {
-      chunks.push(array.slice(i, i + chunkSize))
-    }
-    return chunks
-  }
-
   const handleRedirect = (id: number) => {
     router.push(isAdmin ? `/admin/audits/${id}` : `/audits/${id}`)
   }
@@ -109,6 +99,9 @@ export function NewAuditModal({
     setError(null)
     try {
       const formData = new FormData()
+
+      // Adicionar establishment_id
+      formData.append('establishment_id', establishmentId)
 
       // Adicionar todos os arquivos
       files.forEach((file) => {
@@ -134,10 +127,10 @@ export function NewAuditModal({
         JSON.stringify(brandPercentagesObject),
       )
 
-      // Processar os arquivos
+      // Processar os arquivos e criar a auditoria
       let processResponse
       try {
-        processResponse = await processApi.post('/process-excel/', formData, {
+        processResponse = await processApi.post('/audit/', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -148,40 +141,21 @@ export function NewAuditModal({
           'Falha no processamento da planilha. Verifique se os nomes das colunas estão corretos.',
         )
       }
-
-      // Dividir os dados em chunks dinâmicos
-      const CHUNK_SIZE = 1000 // Usa o maior tamanho como chunk
-      const detailsChunks = chunkArray(processResponse.data.details, CHUNK_SIZE)
-      const summaryChunks = chunkArray(processResponse.data.summary, CHUNK_SIZE)
-
-      // Criar a auditoria inicial
-      const initialResponse = await api.post(
-        `/establishments/${establishmentId}/audits`,
-        {
-          detailsData: detailsChunks[0],
-          summaryData: summaryChunks[0],
-          totalChunks: detailsChunks.length,
-          chunkIndex: 0,
-        },
-      )
-
-      const auditId = initialResponse.data.audit.id
-
-      // Enviar os chunks restantes
-      for (let i = 1; i < detailsChunks.length; i++) {
-        await api.post(
-          `/establishments/${establishmentId}/audits/${auditId}/chunks`,
-          {
-            detailsData: detailsChunks[i],
-            summaryData: summaryChunks[i],
-            chunkIndex: i,
-            totalChunks: detailsChunks.length,
-          },
-        )
+      console.log(processResponse.data.audit_id)
+      // Criar objeto audit com os dados retornados
+      const audit: Audit = {
+        id: processResponse.data.audit_id,
+        exported: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        establishmentId: processResponse.data.establishment_id,
+        summaryData: processResponse.data.summaryData,
       }
 
+      const auditId = audit.id
+
       if (onSuccess) {
-        onSuccess(initialResponse.data.audit)
+        onSuccess(audit)
       }
 
       clearForm()
