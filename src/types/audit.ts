@@ -1,7 +1,15 @@
+export interface YearData {
+  id: string
+  year: number
+  value: string
+}
+
 export interface SummaryData {
-  flag: string
-  method: string
-  [key: string]: string
+  id: string
+  brand: string
+  product: string
+  percentage: string
+  years: YearData[]
 }
 
 export interface DetailsData {

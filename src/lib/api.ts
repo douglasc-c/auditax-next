@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 export const api = axios.create({
-  baseURL: 'https://sys.auditaxs.com.br',
-  // baseURL: 'http://localhost:3333',
+  // baseURL: 'https://sys.auditaxs.com.br',
+  baseURL: 'http://localhost:3333',
   timeout: 60000, // 60 segundos
   withCredentials: true,
   headers: {

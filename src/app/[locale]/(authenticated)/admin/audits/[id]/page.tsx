@@ -18,6 +18,7 @@ export default function AuditDetails() {
     const fetchAudit = async () => {
       try {
         const response = await api.get(`/audits/${params.id}`)
+
         setAudit(response.data.audit)
       } catch (error) {
         if (axios.isAxiosError(error)) {
