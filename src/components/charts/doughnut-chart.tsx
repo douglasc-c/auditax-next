@@ -18,40 +18,41 @@ interface DoughnutChartProps {
   }
 }
 
+// Função para gerar cores HSL com boa distinção visual
+function generateColors(count: number) {
+  const colors = []
+  const borderColors = []
+
+  for (let i = 0; i < count; i++) {
+    // Distribuir as cores uniformemente no espectro HSL
+    const hue = (i * 360) / count
+    const saturation = 70 + (i % 20) // Varia entre 70-90%
+    const lightness = 50 + (i % 15) // Varia entre 50-65%
+
+    // Cor de fundo com transparência
+    const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`
+    // Cor da borda sem transparência
+    const borderColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`
+
+    colors.push(backgroundColor)
+    borderColors.push(borderColor)
+  }
+
+  return { colors, borderColors }
+}
+
 export function DoughnutChart({ data }: DoughnutChartProps) {
+  const { colors, borderColors } = generateColors(
+    Math.max(data.labels.length, 100),
+  )
+
   const chartData = {
     labels: data.labels,
     datasets: [
       {
         data: data.values,
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.8)',
-          'rgba(54, 162, 235, 0.8)',
-          'rgba(255, 206, 86, 0.8)',
-          'rgba(75, 192, 192, 0.8)',
-          'rgba(153, 102, 255, 0.8)',
-          'rgba(255, 159, 64, 0.8)',
-          'rgba(199, 199, 199, 0.8)',
-          'rgba(83, 102, 255, 0.8)',
-          'rgba(40, 167, 69, 0.8)',
-          'rgba(220, 53, 69, 0.8)',
-          'rgba(23, 162, 184, 0.8)',
-          'rgba(255, 193, 7, 0.8)',
-        ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(255, 206, 86, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(153, 102, 255, 1)',
-          'rgba(255, 159, 64, 1)',
-          'rgba(199, 199, 199, 1)',
-          'rgba(83, 102, 255, 1)',
-          'rgba(40, 167, 69, 1)',
-          'rgba(220, 53, 69, 1)',
-          'rgba(23, 162, 184, 1)',
-          'rgba(255, 193, 7, 1)',
-        ],
+        backgroundColor: colors.slice(0, data.labels.length),
+        borderColor: borderColors.slice(0, data.labels.length),
         borderWidth: 1,
       },
     ],
