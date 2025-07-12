@@ -286,7 +286,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
       // Salvar o arquivo
       XLSX.writeFile(
         wb,
-        `${t('analytics')}-${new Date().toISOString().split('T')[0]}.xlsx`,
+        `${t('analytics')}-${establishmentData?.companyName}.xlsx`,
       )
     } catch (error) {
       console.error('Erro ao exportar dados:', error)
@@ -515,7 +515,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     }
 
     // Salvar o PDF
-    doc.save(`sintese-${establishmentData?.companyName}.pdf`)
+    doc.save(`${t('synthesis')}-${establishmentData?.companyName}.pdf`)
   }
 
   const handleShareSummary = () => {
