@@ -271,7 +271,7 @@ export function NewAuditModal({
               disabled={loading}
             />
             {files.length > 0 && (
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 space-y-2 overflow-auto max-h-32 scrollbar-hide">
                 {files.map((file, index) => (
                   <div
                     key={index}
