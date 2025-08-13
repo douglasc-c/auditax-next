@@ -10,6 +10,7 @@ import Image from 'next/image'
 interface FlagPercentage {
   brand: string
   product: string
+  modality: string
   percentage: number
 }
 
@@ -32,7 +33,7 @@ export function NewAuditModal({
   const isAdmin = pathname.includes('/admin')
   const [files, setFiles] = useState<File[]>([])
   const [brandPercentages, setBrandPercentages] = useState<FlagPercentage[]>([
-    { brand: '', product: '', percentage: 0 },
+    { brand: '', product: '', modality: '', percentage: 0 },
   ])
   const [loading, setLoading] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
@@ -52,13 +53,15 @@ export function NewAuditModal({
 
   const clearForm = () => {
     setFiles([])
-    setBrandPercentages([{ brand: '', product: '', percentage: 0 }])
+    setBrandPercentages([
+      { brand: '', product: '', modality: '', percentage: 0 },
+    ])
   }
 
   const handleAddBrand = () => {
     setBrandPercentages([
       ...brandPercentages,
-      { brand: '', product: '', percentage: 0 },
+      { brand: '', product: '', modality: '', percentage: 0 },
     ])
   }
 
@@ -68,7 +71,7 @@ export function NewAuditModal({
 
   const handleBrandChange = (
     index: number,
-    field: 'brand' | 'product' | 'percentage',
+    field: 'brand' | 'product' | 'modality' | 'percentage',
     value: string,
   ) => {
     const newBrandPercentages = [...brandPercentages]
@@ -95,6 +98,17 @@ export function NewAuditModal({
   const handleSubmit = async () => {
     if (files.length === 0) return
 
+    // Validar se todos os campos obrigatórios estão preenchidos
+    const hasValidBrandPercentages = brandPercentages.some(
+      (item) =>
+        item.brand && item.product && item.modality && item.percentage > 0,
+    )
+
+    if (!hasValidBrandPercentages) {
+      setError(t('fillAllFieldsError'))
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
@@ -110,22 +124,34 @@ export function NewAuditModal({
 
       // Converter array de flagPercentages para objeto agrupado por brand
       const brandPercentagesObject = brandPercentages.reduce(
-        (acc, { brand, product, percentage }) => {
-          if (brand && product && percentage > 0) {
-            if (!acc[brand]) {
-              acc[brand] = {}
+        (acc, { brand, product, modality, percentage }) => {
+          if (brand && product && modality && percentage > 0) {
+            acc[brand] = {
+              modality,
+              product,
+              percentage,
             }
-            acc[brand][product] = percentage
           }
           return acc
         },
-        {} as Record<string, Record<string, number>>,
+        {} as Record<
+          string,
+          { modality: string; product: string; percentage: number }
+        >,
       )
 
       formData.append(
         'brand_percentages',
         JSON.stringify(brandPercentagesObject),
       )
+
+      // Log para verificar a estrutura dos dados
+      console.log('Dados das bandeiras sendo enviados:', brandPercentagesObject)
+      console.log('FormData completo:', {
+        establishment_id: establishmentId,
+        files: files.length,
+        brand_percentages: brandPercentagesObject,
+      })
 
       // Processar os arquivos e criar a auditoria
       let processResponse
@@ -183,8 +209,8 @@ export function NewAuditModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-auto">
-      <div className="bg-zinc-900 p-6 rounded-lg w-full max-w-2xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-auto scrollbar-hide">
+      <div className="bg-zinc-900 p-6 rounded-lg w-full max-w-4xl">
         {error && (
           <div className="mb-4 p-4 bg-red-900/50 border border-red-500 rounded-lg text-red-200">
             {error}
@@ -271,7 +297,7 @@ export function NewAuditModal({
               disabled={loading}
             />
             {files.length > 0 && (
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 space-y-2 overflow-auto max-h-32 scrollbar-hide">
                 {files.map((file, index) => (
                   <div
                     key={index}
@@ -323,7 +349,7 @@ export function NewAuditModal({
                 {t('addFlag')}
               </button>
             </div>
-            <div className="space-y-2 overflow-auto max-h-56">
+            <div className="space-y-2 overflow-auto max-h-56 scrollbar-hide">
               {brandPercentages.map((brand, index) => (
                 <div key={index} className="flex gap-2 h-8">
                   <input
@@ -333,6 +359,15 @@ export function NewAuditModal({
                       handleBrandChange(index, 'brand', e.target.value)
                     }
                     placeholder={t('brand')}
+                    className="flex-1 p-2 bg-zinc-800 text-zinc-200 rounded"
+                  />
+                  <input
+                    type="text"
+                    value={brand.modality}
+                    onChange={(e) =>
+                      handleBrandChange(index, 'modality', e.target.value)
+                    }
+                    placeholder={t('modality')}
                     className="flex-1 p-2 bg-zinc-800 text-zinc-200 rounded"
                   />
                   <input
