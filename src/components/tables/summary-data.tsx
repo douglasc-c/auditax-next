@@ -173,10 +173,14 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
     // Substitui a vírgula por ponto para conversão
     const numericValue = cleanValue.replace(',', '.')
     const number = Number(numericValue)
-    return number.toLocaleString('pt-BR', {
+
+    // Formatar mantendo todas as casas decimais originais
+    const formattedNumber = number.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 14, // Permitir até 14 casas decimais
     })
+
+    return formattedNumber
   }
 
   // Função para converter string formatada em número
