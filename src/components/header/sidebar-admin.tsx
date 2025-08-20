@@ -91,14 +91,6 @@ const Sidebar: React.FC<SidebarProps> = ({ locale }) => {
             <nav className="grid gap-4">
               <ButtonMenu
                 params={{
-                  title: t('users'),
-                  path: `/${locale}/admin/users`,
-                  icon: 'users',
-                  isMinimized,
-                }}
-              />
-              <ButtonMenu
-                params={{
                   title: t('establishments'),
                   path: `/${locale}/admin/establishments`,
                   icon: 'estableshments',
@@ -110,6 +102,14 @@ const Sidebar: React.FC<SidebarProps> = ({ locale }) => {
                   title: t('audits'),
                   path: `/${locale}/admin/audits`,
                   icon: 'audits',
+                  isMinimized,
+                }}
+              />
+              <ButtonMenu
+                params={{
+                  title: t('users'),
+                  path: `/${locale}/admin/users`,
+                  icon: 'users',
                   isMinimized,
                 }}
               />
