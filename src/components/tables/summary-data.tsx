@@ -75,6 +75,8 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
   const [isFlagDropdownOpen, setIsFlagDropdownOpen] = useState(false)
   const [isMethodDropdownOpen, setIsMethodDropdownOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+  const [isExportingPDF, setIsExportingPDF] = useState(false)
 
   // Transformar dados da nova estrutura para a estrutura esperada
   const transformedData = useMemo(() => {
@@ -223,6 +225,7 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
   const handleExportExcel = async () => {
     if (!data) return
 
+    setIsExportingExcel(true)
     try {
       // Buscar todos os dados para exportação
       const response = await api.get(`/audits/${auditId}/details?allItems=true`)
@@ -292,234 +295,249 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
         wb,
         `${t('analytics')}-${establishmentData?.companyName}.xlsx`,
       )
+
+      // Mostrar toast de sucesso
+      toast.success(t('excelExportedSuccess'))
     } catch (error) {
       console.error('Erro ao exportar dados:', error)
+      toast.error(t('excelExportError'))
+    } finally {
+      setIsExportingExcel(false)
     }
   }
 
   const handleExportPDF = async () => {
-    const doc = new JSPDF()
-
-    // Adicionar marca d'água
-    doc.saveGraphicsState()
-    doc.setGState(new GState({ opacity: 0.1 }))
-    doc.setTextColor(128, 128, 128)
-    doc.setFontSize(150)
-    doc.text('AUDITAXS', 23, 250, { angle: 45 })
-    doc.restoreGraphicsState()
-
-    // Configurar o título e ID lado a lado
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(41, 41, 41)
-
-    // Adicionar logo
+    setIsExportingPDF(true)
     try {
-      const logoImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new window.Image()
-        img.onload = () => resolve(img)
-        img.onerror = reject
-        img.src = '/images/svg/logoBlack.svg'
-      })
+      const doc = new JSPDF()
 
-      // Criar um canvas para converter SVG em PNG
-      const canvas = document.createElement('canvas')
-      canvas.width = logoImg.width
-      canvas.height = logoImg.height
-      const ctx = canvas.getContext('2d')
-      if (ctx) {
-        ctx.drawImage(logoImg, 0, 0)
-        const pngData = canvas.toDataURL('image/png')
-        doc.addImage(pngData, 'PNG', 10, 10, 70, 15)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar logo:', error)
-    }
+      // Adicionar marca d'água
+      doc.saveGraphicsState()
+      doc.setGState(new GState({ opacity: 0.1 }))
+      doc.setTextColor(128, 128, 128)
+      doc.setFontSize(150)
+      doc.text('AUDITAXS', 23, 250, { angle: 45 })
+      doc.restoreGraphicsState()
 
-    // Configurar o título e ID lado a lado
-    doc.setFontSize(16)
-    const titleText = t('summaryData')
-    const titleWidth = doc.getTextWidth(titleText)
-    doc.text(titleText, 10, 35)
-
-    // Adicionar ID com cor de fundo
-    doc.setTextColor(231, 146, 4) // Cor #e79204
-    doc.setFontSize(12)
-    doc.text(`#${auditId}`, titleWidth + 12, 35)
-
-    // Resetar cor do texto para preto
-    doc.setTextColor(41, 41, 41)
-
-    if (establishmentData) {
-      doc.setFontSize(10)
-
-      // Adicionar os dados em linhas separadas
-      doc.setFont('helvetica', 'normal')
-      doc.text(`${t('establishment')}:`, 10, 45)
+      // Configurar o título e ID lado a lado
       doc.setFont('helvetica', 'bold')
-      doc.text(establishmentData.companyName, 10, 50)
+      doc.setTextColor(41, 41, 41)
 
-      doc.setFont('helvetica', 'normal')
-      doc.text(`${t('cnpj')}:`, 10, 55)
-      doc.setFont('helvetica', 'bold')
-      doc.text(establishmentData.cnpj, 10, 60)
+      // Adicionar logo
+      try {
+        const logoImg = await new Promise<HTMLImageElement>(
+          (resolve, reject) => {
+            const img = new window.Image()
+            img.onload = () => resolve(img)
+            img.onerror = reject
+            img.src = '/images/svg/logoBlack.svg'
+          },
+        )
 
-      doc.setFont('helvetica', 'normal')
-      doc.text(`${t('responsible')}:`, 10, 65)
-      doc.setFont('helvetica', 'bold')
-      doc.text(establishmentData.responsible, 10, 70)
-    }
-
-    // Adicionar linha separadora
-    doc.setDrawColor(200, 200, 200)
-    doc.line(10, 75, 200, 75)
-
-    // Capturar os gráficos como imagens
-    const doughnutCanvas = await html2canvas(doughnutChartRef.current!)
-    const barCanvas = await html2canvas(barChartRef.current!)
-    const horizontalBarCanvas = await html2canvas(
-      horizontalBarChartRef.current!,
-    )
-
-    // Adicionar os gráficos ao PDF
-    const doughnutImgData = doughnutCanvas.toDataURL('image/png')
-    const barImgData = barCanvas.toDataURL('image/png')
-    const horizontalBarImgData = horizontalBarCanvas.toDataURL('image/png')
-
-    // Adicionar o gráfico de pizza
-    doc.addImage(doughnutImgData, 'PNG', 10, 80, 60, 48)
-
-    // Adicionar o gráfico de barras
-    doc.addImage(barImgData, 'PNG', 75, 80, 60, 48)
-
-    // Adicionar o gráfico de barras horizontais
-    doc.addImage(horizontalBarImgData, 'PNG', 140, 80, 60, 48)
-
-    // Preparar os dados para a tabela
-    const tableData = [
-      ...filteredData.map((row) => [
-        row.brand,
-        row.product,
-        row.percent,
-        ...years.map((year) => formatValue(row[year])),
-        formatNumberBR(calculateRowTotalForTableRow(row)),
-      ]),
-      // Adiciona linha de total
-      [
-        t('totalGeneral'),
-        '-',
-        '-',
-        ...years.map((year) =>
-          formatNumberBR(
-            filteredData.reduce((sum, row) => sum + parseValue(row[year]), 0),
-          ),
-        ),
-        formatNumberBR(
-          filteredData.reduce(
-            (sum, row) => sum + calculateRowTotalForTableRow(row),
-            0,
-          ),
-        ),
-      ],
-    ]
-
-    // Configurar as colunas
-    const columns = [
-      t('brand'),
-      t('product'),
-      t('fee') + ' (%)',
-      ...years,
-      t('total') + ' (R$)',
-    ]
-
-    // Adicionar a tabela ao PDF
-    autoTable(doc, {
-      head: [columns],
-      body: tableData,
-      startY: 132,
-      theme: 'grid',
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        font: 'helvetica',
-        fillColor: false,
-      },
-      headStyles: {
-        fillColor: [41, 41, 41],
-        textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 9,
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245],
-      },
-      // Estilizar a última linha (totais)
-      didParseCell: function (data) {
-        if (data.row.index === tableData.length - 1) {
-          data.cell.styles.fontStyle = 'bold'
-          data.cell.styles.fontSize = 9
+        // Criar um canvas para converter SVG em PNG
+        const canvas = document.createElement('canvas')
+        canvas.width = logoImg.width
+        canvas.height = logoImg.height
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(logoImg, 0, 0)
+          const pngData = canvas.toDataURL('image/png')
+          doc.addImage(pngData, 'PNG', 10, 10, 70, 15)
         }
-      },
-      margin: { top: 20, left: 10, right: 10 },
-    })
+      } catch (error) {
+        console.error('Erro ao carregar logo:', error)
+      }
 
-    // Adicionar rodapé
-    const pageCount = doc.getNumberOfPages()
-    const date = new Date()
-    const months = [
-      'janeiro',
-      'fevereiro',
-      'março',
-      'abril',
-      'maio',
-      'junho',
-      'julho',
-      'agosto',
-      'setembro',
-      'outubro',
-      'novembro',
-      'dezembro',
-    ]
-    const currentDate = `${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`
-    const currentTime = date.toLocaleTimeString('pt-BR')
+      // Configurar o título e ID lado a lado
+      doc.setFontSize(16)
+      const titleText = t('summaryData')
+      const titleWidth = doc.getTextWidth(titleText)
+      doc.text(titleText, 10, 35)
 
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i)
+      // Adicionar ID com cor de fundo
+      doc.setTextColor(231, 146, 4) // Cor #e79204
+      doc.setFontSize(12)
+      doc.text(`#${auditId}`, titleWidth + 12, 35)
+
+      // Resetar cor do texto para preto
+      doc.setTextColor(41, 41, 41)
+
+      if (establishmentData) {
+        doc.setFontSize(10)
+
+        // Adicionar os dados em linhas separadas
+        doc.setFont('helvetica', 'normal')
+        doc.text(`${t('establishment')}:`, 10, 45)
+        doc.setFont('helvetica', 'bold')
+        doc.text(establishmentData.companyName, 10, 50)
+
+        doc.setFont('helvetica', 'normal')
+        doc.text(`${t('cnpj')}:`, 10, 55)
+        doc.setFont('helvetica', 'bold')
+        doc.text(establishmentData.cnpj, 10, 60)
+
+        doc.setFont('helvetica', 'normal')
+        doc.text(`${t('responsible')}:`, 10, 65)
+        doc.setFont('helvetica', 'bold')
+        doc.text(establishmentData.responsible, 10, 70)
+      }
 
       // Adicionar linha separadora
       doc.setDrawColor(200, 200, 200)
-      doc.line(
-        10,
-        doc.internal.pageSize.height - 15,
-        200,
-        doc.internal.pageSize.height - 15,
+      doc.line(10, 75, 200, 75)
+
+      // Capturar os gráficos como imagens
+      const doughnutCanvas = await html2canvas(doughnutChartRef.current!)
+      const barCanvas = await html2canvas(barChartRef.current!)
+      const horizontalBarCanvas = await html2canvas(
+        horizontalBarChartRef.current!,
       )
 
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(128, 128, 128)
+      // Adicionar os gráficos ao PDF
+      const doughnutImgData = doughnutCanvas.toDataURL('image/png')
+      const barImgData = barCanvas.toDataURL('image/png')
+      const horizontalBarImgData = horizontalBarCanvas.toDataURL('image/png')
 
-      // Informações do rodapé
-      const footerText = `Auditaxs | ${currentDate} - ${currentTime}, Curitiba, Paraná, Brasil | ID: ${auditId}`
+      // Adicionar o gráfico de pizza
+      doc.addImage(doughnutImgData, 'PNG', 10, 80, 60, 48)
 
-      // Adicionar paginação à esquerda
-      doc.text(
-        `Página ${i} de ${pageCount}`,
-        10,
-        doc.internal.pageSize.height - 10,
-        { align: 'left' },
-      )
+      // Adicionar o gráfico de barras
+      doc.addImage(barImgData, 'PNG', 75, 80, 60, 48)
 
-      // Adicionar informações à direita
-      doc.text(
-        footerText,
-        doc.internal.pageSize.width - 10,
-        doc.internal.pageSize.height - 10,
-        { align: 'right' },
-      )
+      // Adicionar o gráfico de barras horizontais
+      doc.addImage(horizontalBarImgData, 'PNG', 140, 80, 60, 48)
+
+      // Preparar os dados para a tabela
+      const tableData = [
+        ...filteredData.map((row) => [
+          row.brand,
+          row.product,
+          row.percent,
+          ...years.map((year) => formatValue(row[year])),
+          formatNumberBR(calculateRowTotalForTableRow(row)),
+        ]),
+        // Adiciona linha de total
+        [
+          t('totalGeneral'),
+          '-',
+          '-',
+          ...years.map((year) =>
+            formatNumberBR(
+              filteredData.reduce((sum, row) => sum + parseValue(row[year]), 0),
+            ),
+          ),
+          formatNumberBR(
+            filteredData.reduce(
+              (sum, row) => sum + calculateRowTotalForTableRow(row),
+              0,
+            ),
+          ),
+        ],
+      ]
+
+      // Configurar as colunas
+      const columns = [
+        t('brand'),
+        t('product'),
+        t('fee') + ' (%)',
+        ...years,
+        t('total') + ' (R$)',
+      ]
+
+      // Adicionar a tabela ao PDF
+      autoTable(doc, {
+        head: [columns],
+        body: tableData,
+        startY: 132,
+        theme: 'grid',
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          font: 'helvetica',
+          fillColor: false,
+        },
+        headStyles: {
+          fillColor: [41, 41, 41],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 9,
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245],
+        },
+        // Estilizar a última linha (totais)
+        didParseCell: function (data) {
+          if (data.row.index === tableData.length - 1) {
+            data.cell.styles.fontStyle = 'bold'
+            data.cell.styles.fontSize = 9
+          }
+        },
+        margin: { top: 20, left: 10, right: 10 },
+      })
+
+      // Adicionar rodapé
+      const pageCount = doc.getNumberOfPages()
+      const date = new Date()
+      const months = [
+        'janeiro',
+        'fevereiro',
+        'março',
+        'abril',
+        'maio',
+        'junho',
+        'julho',
+        'agosto',
+        'setembro',
+        'outubro',
+        'novembro',
+        'dezembro',
+      ]
+      const currentDate = `${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`
+      const currentTime = date.toLocaleTimeString('pt-BR')
+
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+
+        // Adicionar linha separadora
+        doc.setDrawColor(200, 200, 200)
+        doc.line(
+          10,
+          doc.internal.pageSize.height - 15,
+          200,
+          doc.internal.pageSize.height - 15,
+        )
+
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(128, 128, 128)
+
+        // Informações do rodapé
+        const footerText = `Auditaxs | ${currentDate} - ${currentTime}, Curitiba, Paraná, Brasil | ID: ${auditId}`
+
+        // Adicionar paginação à esquerda
+        doc.text(
+          `Página ${i} de ${pageCount}`,
+          10,
+          doc.internal.pageSize.height - 10,
+          { align: 'left' },
+        )
+
+        // Adicionar informações à direita
+        doc.text(
+          footerText,
+          doc.internal.pageSize.width - 10,
+          doc.internal.pageSize.height - 10,
+          { align: 'right' },
+        )
+      }
+
+      // Salvar o PDF
+      doc.save(`${t('synthesis')}-${establishmentData?.companyName}.pdf`)
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error)
+    } finally {
+      setIsExportingPDF(false)
     }
-
-    // Salvar o PDF
-    doc.save(`${t('synthesis')}-${establishmentData?.companyName}.pdf`)
   }
 
   const handleShareSummary = () => {
@@ -765,16 +783,32 @@ export function SummaryDataTable({ data, auditId }: SummaryDataTableProps) {
                   </button>
                   <button
                     onClick={handleExportPDF}
-                    className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-700"
+                    disabled={isExportingPDF}
+                    className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {t('exportPDF')}
+                    {isExportingPDF ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-zinc-300 border-t-transparent rounded-full animate-spin"></div>
+                        {t('exporting')}
+                      </div>
+                    ) : (
+                      t('exportPDF')
+                    )}
                   </button>
                   {!isSummaryRoute && (
                     <button
                       onClick={handleExportExcel}
-                      className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-700"
+                      disabled={isExportingExcel}
+                      className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {t('exportExcel')}
+                      {isExportingExcel ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-zinc-300 border-t-transparent rounded-full animate-spin"></div>
+                          {t('exporting')}
+                        </div>
+                      ) : (
+                        t('exportExcel')
+                      )}
                     </button>
                   )}
                 </div>

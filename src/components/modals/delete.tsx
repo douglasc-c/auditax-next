@@ -6,12 +6,14 @@ interface DeleteModalProps {
   isOpen: boolean
   handleSubmit: () => void
   onClose: () => void
+  isLoading?: boolean
 }
 
 const DeleteModal: FC<DeleteModalProps> = ({
   isOpen,
   handleSubmit,
   onClose,
+  isLoading = false,
 }) => {
   const t = useTranslations('TextLang')
 
@@ -28,14 +30,23 @@ const DeleteModal: FC<DeleteModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="bg-zinc-600 text-white py-2 text-sm px-4 rounded-lg w-[90%]"
+              disabled={isLoading}
+              className="bg-zinc-600 text-white py-2 text-sm px-4 rounded-lg w-[90%] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t('cancel')}
             </button>
             <ButtonGlobal
               type="submit"
+              disabled={isLoading}
               params={{
-                title: t('delete'),
+                title: isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    {t('deleting')}
+                  </div>
+                ) : (
+                  t('delete')
+                ),
                 color: 'bg-red-600',
               }}
             />
