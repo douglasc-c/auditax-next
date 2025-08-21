@@ -47,7 +47,7 @@ export default function SignIn() {
           }; path=/; SameSite=Strict`
 
           const roleRoutes: { [key: string]: string } = {
-            ADMIN: '/admin/users',
+            ADMIN: '/admin/establishments',
             USER: '/establishments',
           }
 

@@ -8,6 +8,7 @@ import { NewAuditModal } from '../modals/new-audit-modal'
 import { useState } from 'react'
 import api from '@/lib/api'
 import DeleteModal from '../modals/delete'
+import { toast } from 'react-hot-toast'
 
 interface AuditsProps {
   audits?: Audit[]
@@ -26,6 +27,7 @@ export function Audits({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [auditToDelete, setAuditToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [selectedEstablishmentId, setSelectedEstablishmentId] = useState<
     number | null
   >(null)
@@ -49,12 +51,23 @@ export function Audits({
   const confirmDelete = async () => {
     if (!auditToDelete) return
 
+    setIsDeleting(true)
     try {
-      await api.delete(`/audits/${auditToDelete}`)
-      window.location.reload()
+      const response = await api.delete(`/audits/${auditToDelete}`)
+
+      // Só recarrega se a operação foi bem-sucedida
+      if (response.status === 200 || response.status === 204) {
+        toast.success(t('auditDeletedSuccess'))
+        window.location.reload()
+      } else {
+        toast.error(t('auditDeleteError'))
+      }
     } catch (error) {
       console.error('Erro ao excluir auditoria:', error)
+      toast.error(t('auditDeleteError'))
+      // Em caso de erro, não recarrega a página
     } finally {
+      setIsDeleting(false)
       setIsDeleteModalOpen(false)
       setAuditToDelete(null)
     }
@@ -179,6 +192,7 @@ export function Audits({
           setAuditToDelete(null)
         }}
         handleSubmit={confirmDelete}
+        isLoading={isDeleting}
       />
     </>
   )
